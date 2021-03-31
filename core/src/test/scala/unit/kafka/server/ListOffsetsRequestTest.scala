@@ -23,6 +23,7 @@ import org.apache.kafka.common.message.ListOffsetsRequestData.{ListOffsetsPartit
 import org.apache.kafka.common.protocol.{ApiKeys, Errors}
 import org.apache.kafka.common.requests.{ListOffsetsRequest, ListOffsetsResponse}
 import org.apache.kafka.common.{IsolationLevel, TopicPartition}
+import org.apache.kafka.test
 import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.api.Test
 
@@ -80,7 +81,7 @@ class ListOffsetsRequestTest extends BaseRequestTest {
     assertResponseError(Errors.NOT_LEADER_OR_FOLLOWER, nonReplica, debugReplicaRequest)
   }
 
-  def assertResponseErrorForEpoch(error: Errors, brokerId: Int, currentLeaderEpoch: Optional[Integer]): Unit = {
+  private def assertResponseErrorForEpoch(error: Errors, brokerId: Int, currentLeaderEpoch: Optional[Integer]): Unit = {
     val listOffsetPartition = new ListOffsetsPartition()
       .setPartitionIndex(partition.partition)
       .setTimestamp(ListOffsetsRequest.EARLIEST_TIMESTAMP)
@@ -123,8 +124,16 @@ class ListOffsetsRequestTest extends BaseRequestTest {
     assertResponseErrorForEpoch(Errors.FENCED_LEADER_EPOCH, followerId, Optional.of(secondLeaderEpoch - 1))
   }
 
-  // -1 indicate "latest"
-  def fetchOffsetAndEpoch(serverId: Int,
+
+  /**
+   * fetch offset and the leader epoch of the topic: "topic" and partition: 0
+   *
+   * @param  serverId    the target broker Id
+   * @param  timestamp   the starting timestamp of the fetching records
+   * @param  version     the api version for the request, "-1" indicates the "latest"
+   * @return offset and the leader epoch
+   */
+  private def fetchOffsetAndEpoch(serverId: Int,
                           timestamp: Long,
                           version: Short): (Long, Int) = {
     val targetTimes = List(new ListOffsetsTopic()
@@ -152,6 +161,31 @@ class ListOffsetsRequestTest extends BaseRequestTest {
       (partitionData.offset, partitionData.leaderEpoch)
   }
 
+  /**
+   * wait for the offsets available on the broker id
+   *
+   * @param  serverId    the target broker Id
+   * @param  timestamp   the starting timestamp of the fetching records
+   * @return offset and the leader epoch
+   */
+  private def waitForOffsetAvailable(serverId: Int,
+                          timestamp: Long): Unit = {
+    val targetTimes = List(new ListOffsetsTopic()
+      .setName(topic)
+      .setPartitions(List(new ListOffsetsPartition()
+        .setPartitionIndex(partition.partition)
+        .setTimestamp(timestamp)).asJava)).asJava
+
+    val builder = ListOffsetsRequest.Builder
+      .forConsumer(false, IsolationLevel.READ_UNCOMMITTED)
+      .setTargetTimes(targetTimes)
+
+    val request = builder.build()
+
+    test.TestUtils.retryOnExceptionWithTimeout(
+      () => assertResponseError(Errors.NONE, serverId, request))
+  }
+
   @Test
   def testResponseIncludesLeaderEpoch(): Unit = {
     val partitionToLeader = TestUtils.createTopic(zkClient, topic, numPartitions = 1, replicationFactor = 3, servers)
@@ -159,6 +193,7 @@ class ListOffsetsRequestTest extends BaseRequestTest {
 
     TestUtils.generateAndProduceMessages(servers, topic, 10)
 
+    waitForOffsetAvailable(firstLeaderId, 0L)
     assertEquals((0L, 0), fetchOffsetAndEpoch(firstLeaderId, 0L, -1))
     assertEquals((0L, 0), fetchOffsetAndEpoch(firstLeaderId, ListOffsetsRequest.EARLIEST_TIMESTAMP, -1))
     assertEquals((10L, 0), fetchOffsetAndEpoch(firstLeaderId, ListOffsetsRequest.LATEST_TIMESTAMP, -1))
@@ -167,6 +202,7 @@ class ListOffsetsRequestTest extends BaseRequestTest {
     killBroker(firstLeaderId)
     val secondLeaderId = TestUtils.awaitLeaderChange(servers, partition, firstLeaderId)
     val secondLeaderEpoch = TestUtils.findLeaderEpoch(secondLeaderId, partition, servers)
+    waitForOffsetAvailable(secondLeaderId, 0L)
 
     // No changes to written data
     assertEquals((0L, 0), fetchOffsetAndEpoch(secondLeaderId, 0L, -1))
@@ -185,6 +221,7 @@ class ListOffsetsRequestTest extends BaseRequestTest {
     val firstLeaderId = partitionToLeader(partition.partition)
 
     TestUtils.generateAndProduceMessages(servers, topic, 10)
+    waitForOffsetAvailable(firstLeaderId, 0L)
 
     for (version <- ApiKeys.LIST_OFFSETS.oldestVersion to ApiKeys.LIST_OFFSETS.latestVersion) {
       if (version == 0) {

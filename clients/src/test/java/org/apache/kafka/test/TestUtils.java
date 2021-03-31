@@ -320,7 +320,7 @@ public class TestUtils {
     }
 
     /**
-     * Wait for the given runnable to complete successfully, i.e. throw now {@link Exception}s or
+     * Wait for the given runnable to complete successfully, i.e. throw {@link Exception}s or
      * {@link AssertionError}s, or for the default timeout to expire. If the timeout expires then the
      * last exception or assertion failure will be thrown thus providing context for the failure.
      *
