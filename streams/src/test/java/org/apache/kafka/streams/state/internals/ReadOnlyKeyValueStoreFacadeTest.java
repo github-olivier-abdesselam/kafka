@@ -69,9 +69,11 @@ public class ReadOnlyKeyValueStoreFacadeTest {
         expect(mockedKeyValueTimestampStore.range("key1", "key2")).andReturn(mockedKeyValueTimestampIterator);
         replay(mockedKeyValueTimestampIterator, mockedKeyValueTimestampStore);
 
-        final KeyValueIterator<String, String> iterator = readOnlyKeyValueStoreFacade.range("key1", "key2");
-        assertThat(iterator.next(), is(KeyValue.pair("key1", "value1")));
-        assertThat(iterator.next(), is(KeyValue.pair("key2", "value2")));
+        try (final KeyValueIterator<String, String> iterator = readOnlyKeyValueStoreFacade.range("key1", "key2")) {
+            assertThat(iterator.next(), is(KeyValue.pair("key1", "value1")));
+            assertThat(iterator.next(), is(KeyValue.pair("key2", "value2")));
+        }
+
         verify(mockedKeyValueTimestampIterator, mockedKeyValueTimestampStore);
     }
 
@@ -84,9 +86,11 @@ public class ReadOnlyKeyValueStoreFacadeTest {
         expect(mockedKeyValueTimestampStore.prefixScan("key", stringSerializer)).andReturn(mockedKeyValueTimestampIterator);
         replay(mockedKeyValueTimestampIterator, mockedKeyValueTimestampStore);
 
-        final KeyValueIterator<String, String> iterator = readOnlyKeyValueStoreFacade.prefixScan("key", stringSerializer);
-        assertThat(iterator.next(), is(KeyValue.pair("key1", "value1")));
-        assertThat(iterator.next(), is(KeyValue.pair("key2", "value2")));
+        try (final KeyValueIterator<String, String> iterator = readOnlyKeyValueStoreFacade.prefixScan("key", stringSerializer)) {
+            assertThat(iterator.next(), is(KeyValue.pair("key1", "value1")));
+            assertThat(iterator.next(), is(KeyValue.pair("key2", "value2")));
+        }
+
         verify(mockedKeyValueTimestampIterator, mockedKeyValueTimestampStore);
     }
 
@@ -98,9 +102,11 @@ public class ReadOnlyKeyValueStoreFacadeTest {
         expect(mockedKeyValueTimestampStore.all()).andReturn(mockedKeyValueTimestampIterator);
         replay(mockedKeyValueTimestampIterator, mockedKeyValueTimestampStore);
 
-        final KeyValueIterator<String, String> iterator = readOnlyKeyValueStoreFacade.all();
-        assertThat(iterator.next(), is(KeyValue.pair("key1", "value1")));
-        assertThat(iterator.next(), is(KeyValue.pair("key2", "value2")));
+        try (final KeyValueIterator<String, String> iterator = readOnlyKeyValueStoreFacade.all()) {
+            assertThat(iterator.next(), is(KeyValue.pair("key1", "value1")));
+            assertThat(iterator.next(), is(KeyValue.pair("key2", "value2")));
+        }
+
         verify(mockedKeyValueTimestampIterator, mockedKeyValueTimestampStore);
     }
 
