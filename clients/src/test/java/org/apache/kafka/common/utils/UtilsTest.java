@@ -301,19 +301,54 @@ public class UtilsTest {
     }
 
     private void doTestUtf8ByteBuffer(ByteBuffer utf8Buffer) {
+        String asciString = "ABCD";
         String utf8String = "A\u00ea\u00f1\u00fcC";
-        byte[] utf8Bytes = utf8String.getBytes(StandardCharsets.UTF_8);
+        String anotherUtf8String = "B\u00e5\u008b\u008cD";
+        byte[] asci8Bytes = Utils.utf8(asciString);
+        byte[] utf8Bytes = Utils.utf8(utf8String);
+        byte[] anotherUtf8Bytes = Utils.utf8(anotherUtf8String);
+        int utf8BytesLen = utf8Bytes.length;
 
-        utf8Buffer.position(4);
+        utf8Buffer.put(asci8Bytes);
         utf8Buffer.put(utf8Bytes);
+        utf8Buffer.put(anotherUtf8Bytes);
 
-        utf8Buffer.position(4);
-        assertEquals(utf8String, Utils.utf8(utf8Buffer, utf8Bytes.length));
-        assertEquals(4, utf8Buffer.position());
+        int expectedPosition = 0;
+        utf8Buffer.position(expectedPosition);
+        assertEquals(asciString, Utils.utf8(utf8Buffer, asci8Bytes.length));
+        assertEquals(expectedPosition, utf8Buffer.position());
 
-        utf8Buffer.position(0);
-        assertEquals(utf8String, Utils.utf8(utf8Buffer, 4, utf8Bytes.length));
-        assertEquals(0, utf8Buffer.position());
+        expectedPosition = 4;
+        utf8Buffer.position(expectedPosition);
+        assertEquals(utf8String, Utils.utf8(utf8Buffer, utf8BytesLen));
+        assertEquals(expectedPosition, utf8Buffer.position());
+
+        expectedPosition = 4 + utf8BytesLen;
+        utf8Buffer.position(expectedPosition);
+        assertEquals(anotherUtf8String, Utils.utf8(utf8Buffer, anotherUtf8Bytes.length));
+        assertEquals(expectedPosition, utf8Buffer.position());
+
+        // test minus offset value
+        assertEquals(utf8String, Utils.utf8(utf8Buffer, -utf8BytesLen, utf8BytesLen));
+        assertEquals(expectedPosition, utf8Buffer.position());
+
+        assertEquals(asciString + utf8String + anotherUtf8String, Utils.utf8(utf8Buffer, -(utf8BytesLen + asci8Bytes.length),
+            asci8Bytes.length + utf8BytesLen + anotherUtf8Bytes.length));
+        assertEquals(expectedPosition, utf8Buffer.position());
+
+        expectedPosition = 4;
+        utf8Buffer.position(expectedPosition);
+        assertEquals(utf8String + anotherUtf8String, Utils.utf8(utf8Buffer));
+        assertEquals(expectedPosition, utf8Buffer.position());
+
+        expectedPosition = 0;
+        utf8Buffer.position(expectedPosition);
+        assertEquals(utf8String, Utils.utf8(utf8Buffer, 4, utf8BytesLen));
+        assertEquals(expectedPosition, utf8Buffer.position());
+
+        assertEquals(utf8String + anotherUtf8String,
+            Utils.utf8(utf8Buffer, 4, utf8BytesLen + anotherUtf8Bytes.length));
+        assertEquals(expectedPosition, utf8Buffer.position());
     }
 
     private void subTest(ByteBuffer buffer) {
